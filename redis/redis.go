@@ -1,7 +1,6 @@
 package redis_cache
 
 import (
-	"encoding"
 	"net/url"
 	"strconv"
 	"time"
@@ -11,8 +10,8 @@ import (
 )
 
 type Redis struct {
-	p *redis.Client
-	u string
+	cli *redis.Client
+	u   string
 }
 
 var _ cache.Cache = (*Redis)(nil)
@@ -23,6 +22,7 @@ func NewRedis(u string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	que := ur.Query()
 	op := &redis.Options{}
 	for k, v := range que {
@@ -58,20 +58,20 @@ func NewRedis(u string) (*Redis, error) {
 	}
 	op.Addr = ur.Host
 
-	client := redis.NewClient(op)
+	cli := redis.NewClient(op)
 
 	return &Redis{
-		p: client,
-		u: u,
+		cli: cli,
+		u:   u,
 	}, nil
 }
 
 func (rc *Redis) Scan(key string, val interface{}) error {
-	v, ok := val.(encoding.BinaryUnmarshaler)
-	if !ok {
-		v = &cache.Unmarshaler{val}
-	}
-	err := rc.p.Get(key).Scan(v)
+	//	v, ok := val.(encoding.BinaryUnmarshaler)
+	//	if !ok {
+	v := &cache.Unmarshaler{val}
+	//	}
+	err := rc.cli.Get(key).Scan(v)
 	if err != nil {
 		return err
 	}
@@ -88,20 +88,20 @@ func (rc *Redis) Put(key string, val interface{}, timeout time.Duration) error {
 	if timeout < 0 {
 		timeout = 0
 	}
-	v, ok := val.(encoding.BinaryMarshaler)
-	if !ok {
-		v = &cache.Marshaler{val}
-	}
-	_, err := rc.p.Set(key, v, timeout).Result()
+	//	v, ok := val.(encoding.BinaryMarshaler)
+	//	if !ok {
+	v := &cache.Marshaler{val}
+	//	}
+	_, err := rc.cli.Set(key, v, timeout).Result()
 	return err
 }
 
 func (rc *Redis) Delete(key string) error {
-	_, err := rc.p.Del(key).Result()
+	_, err := rc.cli.Del(key).Result()
 	return err
 }
 
 func (rc *Redis) IsExist(key string) bool {
-	d, _ := rc.p.Exists(key).Result()
+	d, _ := rc.cli.Exists(key).Result()
 	return d != 0
 }
