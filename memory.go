@@ -23,26 +23,40 @@ var _ Cache = (*Memory)(nil)
 func NewMemory() *Memory {
 	return &Memory{
 		m: sync.Map{},
-		t: task.NewTask(1),
+		t: task.NewTask(8),
 	}
 }
 
-func (m *Memory) Get(key string) interface{} {
+func (m *Memory) load(key string) *Node {
 	i, ok := m.m.Load(key)
 	if !ok {
 		return nil
 	}
 	n, ok := i.(*Node)
 	if !ok {
+		m.m.Delete(key)
 		return nil
 	}
+	return n
+}
+
+func (m *Memory) Get(key string) interface{} {
+	n := m.load(key)
+	if n == nil {
+		return nil
+	}
+
 	return n.d
 }
 
 func (m *Memory) Put(key string, val interface{}, timeout time.Duration) error {
-	err := m.Delete(key)
-	if err != nil {
-		return err
+	n := m.load(key)
+	if n == nil {
+		return nil
+	}
+
+	if n.n != nil {
+		m.t.Cancel(n.n)
 	}
 
 	if timeout < 0 {
@@ -54,25 +68,23 @@ func (m *Memory) Put(key string, val interface{}, timeout time.Duration) error {
 		t: now,
 		d: val,
 		n: m.t.Add(now.Add(timeout), func() {
-			m.m.Delete(key)
+			m.Delete(key)
 		}),
 	})
+
 	return nil
 }
 
 func (m *Memory) Delete(key string) error {
-	i, ok := m.m.Load(key)
-	if !ok {
+	n := m.load(key)
+	if n == nil {
 		return nil
 	}
-	n, ok := i.(*Node)
-	if !ok {
-		m.m.Delete(key)
-		return nil
-	}
+
 	if n.n != nil {
 		m.t.Cancel(n.n)
 	}
+
 	m.m.Delete(key)
 	return nil
 }
