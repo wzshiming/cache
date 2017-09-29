@@ -49,28 +49,38 @@ func (m *Memory) Get(key string) interface{} {
 	return n.d
 }
 
+func (m *Memory) SetTimeout(key string, timeout time.Duration) error {
+	if timeout <= 0 {
+		return nil
+	}
+	n := m.load(key)
+	if n == nil {
+		return nil
+	}
+
+	if n.n != nil {
+		defer m.t.Cancel(n.n)
+	}
+
+	n.n = m.t.Add(n.t.Add(timeout), func() {
+		m.Delete(key)
+	})
+	return nil
+}
+
 func (m *Memory) Put(key string, val interface{}, timeout time.Duration) error {
 	// 关闭原有值得过期时间
 	n := m.load(key)
 	if n != nil && n.n != nil {
-		m.t.Cancel(n.n)
+		defer m.t.Cancel(n.n)
 	}
 
-	now := time.Now()
-	n = &Node{
-		t: now,
+	m.m.Store(key, &Node{
+		t: time.Now(),
 		d: val,
-	}
+	})
 
-	// 设置值过期时间
-	if timeout > 0 {
-		n.n = m.t.Add(now.Add(timeout), func() {
-			m.Delete(key)
-		})
-	}
-
-	m.m.Store(key, n)
-	return nil
+	return m.SetTimeout(key, timeout)
 }
 
 func (m *Memory) Delete(key string) error {
