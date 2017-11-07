@@ -27,17 +27,34 @@ func NewMemory() *Memory {
 	}
 }
 
-func (m *Memory) load(key string) *Node {
-	i, ok := m.m.Load(key)
-	if !ok {
-		return nil
-	}
+func (m *Memory) node(key string, i interface{}) *Node {
 	n, ok := i.(*Node)
 	if !ok {
 		m.m.Delete(key)
 		return nil
 	}
 	return n
+}
+
+func (m *Memory) load(key string) *Node {
+	i, ok := m.m.Load(key)
+	if !ok {
+		return nil
+	}
+	return m.node(key, i)
+}
+
+func (m *Memory) GetOrPut(key string, val interface{}, timeout time.Duration) (interface{}, bool) {
+	i, ok := m.m.LoadOrStore(key, &Node{
+		t: time.Now(),
+		d: val,
+	})
+	n := m.node(key, i)
+	if ok {
+		return n.d, true
+	}
+	m.SetTimeout(key, timeout)
+	return n.d, false
 }
 
 func (m *Memory) Get(key string) interface{} {
