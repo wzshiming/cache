@@ -1,6 +1,8 @@
 package redis_cache
 
 import (
+	"crypto/tls"
+	"net"
 	"net/url"
 	"strconv"
 	"time"
@@ -56,8 +58,12 @@ func NewRedis(u string) (*Redis, error) {
 			op.Password = r
 		}
 	}
-	op.Addr = ur.Host
+	if ur.Scheme == "rediss" {
+		h, _, _ := net.SplitHostPort(ur.Host)
+		op.TLSConfig = &tls.Config{ServerName: h}
 
+	}
+	op.Addr = ur.Host
 	cli := redis.NewClient(op)
 
 	return &Redis{

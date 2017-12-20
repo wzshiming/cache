@@ -23,7 +23,7 @@ var _ Cache = (*Memory)(nil)
 func NewMemory() *Memory {
 	return &Memory{
 		m: sync.Map{},
-		t: task.NewTask(8),
+		t: task.NewTask(1),
 	}
 }
 
